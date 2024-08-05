@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Translator</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #status { margin-top: 20px; }
+        #loader { display: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>PDF Translator</h1>
+    <input type="file" id="fileInput" />
+    <button onclick="translatePDF()">Translate PDF</button>
+    <div id="status"></div>
+    <a id="downloadLink" class="hidden" href="#" download="translated.pdf">Download Translated PDF</a>
+    <div id="loader" class="loader">Loading...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@google-cloud/translate/build/src/v2/index.js"></script>
+    <script>
+        const apiKey = 'YOUR_GOOGLE_API_KEY'; // Replace with your Google Translate API key
+
+        function translatePDF() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('status');
+            const downloadLink = document.getElementById('downloadLink');
+            const loader = document.getElementById('loader');
+
+            if (fileInput.files.length === 0) {
+                alert('Please upload a PDF file.');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const loadingTask = pdfjsLib.getDocument({data: event.target.result});
+                loadingTask.promise.then(function(pdf) {
+                    let pageNumber = 1;
+                    let textPromises = [];
+
+                    function processPage(page) {
+                        return page.getTextContent().then(function(textContent) {
+                            let text = textContent.items.map(item => item.str).join(' ');
+                            return translateText(text);
+                        });
+                    }
+
+                    function processAllPages() {
+                        return pdf.getPage(pageNumber).then(function(page) {
+                            textPromises.push(processPage(page));
+                            if (pageNumber < pdf.numPages) {
+                                pageNumber++;
+                                return pdf.getPage(pageNumber).then(processAllPages);
+                            } else {
+                                return Promise.all(textPromises);
+                            }
+                        });
+                    }
+
+                    function translateText(text) {
+                        return fetch(`https://translation.googleapis.com/language/translate/v2?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                q: text,
+                                target: 'ur'
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => data.data.translations[0].translatedText);
+                    }
+
+                    loader.classList.remove('hidden');
+                    statusDiv.textContent = 'Translating...';
+
+                    processAllPages().then(translatedTexts => {
+                        generatePDF(translatedTexts.join('\n\n'));
+                    });
+                });
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function generatePDF(text) {
+            const doc = new jsPDF();
+            doc.text(text, 10, 10);
+            const pdfOutput = doc.output('blob');
+
+            const url = URL.createObjectURL(pdfOutput);
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = url;
+            downloadLink.classList.remove('hidden');
+            document.getElementById('status').textContent = 'Translation complete!';
+            document.getElementById('loader').classList.add('hidden');
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>
