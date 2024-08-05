@@ -3,113 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Translator</title>
+    <title>Offline PDF Translator</title>
     <style>
-        #spinner {
-            display: none;
-            border: 16px solid #f3f3f3;
-            border-top: 16px solid #3498db;
-            border-radius: 50%;
-            width: 120px;
-            height: 120px;
-            animation: spin 2s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #status {
-            margin-top: 20px;
-        }
-        #downloadButton {
-            display: none;
-        }
-        #downloadButton.active {
-            display: inline-block;
-        }
-        #advancedAnimation {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border: 16px solid #f3f3f3;
-            border-top: 16px solid #3498db;
-            border-radius: 50%;
-            width: 120px;
-            height: 120px;
-            animation: spin 2s linear infinite;
-        }
+        body { font-family: Arial, sans-serif; }
+        #status { font-size: 1.2em; margin-top: 20px; }
+        .hidden { display: none; }
+        .translate-btn { padding: 10px 20px; font-size: 1em; cursor: pointer; }
+        .download-btn { padding: 10px 20px; font-size: 1em; cursor: pointer; }
+        .loader { display: inline-block; width: 24px; height: 24px; border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #000; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 </head>
 <body>
     <h1>Offline PDF Translator</h1>
-    <input type="file" id="fileInput" accept="application/pdf">
-    <button id="translateButton">Translate PDF</button>
-    <button id="downloadButton">Download Translated PDF</button>
-    <div id="status"></div>
-    <div id="spinner"></div>
-    <div id="advancedAnimation"></div>
+    <input type="file" id="fileInput" />
+    <button class="translate-btn" onclick="translatePDF()">Translate PDF</button>
+    <div id="status" class="hidden"></div>
+    <a id="downloadLink" class="hidden" href="#" download="translated.pdf">
+        <button class="download-btn">Download Translated PDF</button>
+    </a>
+    <div id="loader" class="hidden loader"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script>
-        document.getElementById('translateButton').addEventListener('click', async () => {
+        async function translatePDF() {
             const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert("Please select a PDF file first.");
+            const statusDiv = document.getElementById('status');
+            const downloadLink = document.getElementById('downloadLink');
+            const loader = document.getElementById('loader');
+
+            if (fileInput.files.length === 0) {
+                alert('Please upload a PDF file.');
                 return;
             }
 
-            document.getElementById('spinner').style.display = 'block';
+            loader.classList.remove('hidden');
+            statusDiv.textContent = 'Translating...';
+            statusDiv.classList.remove('hidden');
+            downloadLink.classList.add('hidden');
 
-            try {
-                const pdfData = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                let textContent = '';
+            const file = fileInput.files[0];
+            const reader = new FileReader();
 
-                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    const page = await pdf.getPage(pageNum);
-                    const text = await page.getTextContent();
-                    textContent += text.items.map(item => item.str).join(' ') + '\n';
-                }
+            reader.onload = async function(e) {
+                const pdfBytes = new Uint8Array(e.target.result);
 
-                // Placeholder for translation (replace with actual translation logic)
-                const translatedText = textContent;
+                // Here you should integrate the translation functionality.
+                // For demonstration, we'll simply simulate a translation.
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate translation delay
 
-                // Create new PDF with translated text
-                const newPdfDoc = await PDFLib.PDFDocument.create();
-                const font = await newPdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                // Load the PDF
+                const { PDFDocument } = PDFLib;
+                const pdfDoc = await PDFDocument.load(pdfBytes);
+                const pages = pdfDoc.getPages();
+                const firstPage = pages[0];
+                firstPage.drawText('Translated Text', { x: 50, y: 50 });
 
-                const newPage = newPdfDoc.addPage([600, 800]);
-                newPage.drawText(translatedText, { x: 50, y: 750, size: 12, font });
+                // Serialize the PDFDocument to bytes
+                const translatedPdfBytes = await pdfDoc.save();
 
-                const pdfBytes = await newPdfDoc.save();
+                // Create a Blob and set the download link
+                const blob = new Blob([translatedPdfBytes], { type: 'application/pdf' });
+                downloadLink.href = URL.createObjectURL(blob);
+                downloadLink.classList.remove('hidden');
+                statusDiv.textContent = 'Translation complete!';
+                loader.classList.add('hidden');
+            };
 
-                const downloadButton = document.getElementById('downloadButton');
-                downloadButton.style.display = 'block';
-                downloadButton.addEventListener('click', () => {
-                    document.getElementById('advancedAnimation').style.display = 'block';
-                    setTimeout(() => {
-                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'translated.pdf';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        document.getElementById('advancedAnimation').style.display = 'none';
-                    }, 500); // Simulate delay for animation
-                });
-
-                document.getElementById('status').innerText = 'Translation complete! Click "Download Translated PDF" to save.';
-            } catch (error) {
-                document.getElementById('status').innerText = 'An error occurred: ' + error.message;
-            } finally {
-                document.getElementById('spinner').style.display = 'none';
-            }
-        });
+            reader.readAsArrayBuffer(file);
+        }
     </script>
 </body>
-      </html>
+</html>
