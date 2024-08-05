@@ -6,10 +6,7 @@
     <title>Offline PDF Translator</title>
     <style>
         body { font-family: Arial, sans-serif; }
-        #status { font-size: 1.2em; margin-top: 20px; }
-        .hidden { display: none; }
         .translate-btn { padding: 10px 20px; font-size: 1em; cursor: pointer; }
-        .download-btn { padding: 10px 20px; font-size: 1em; cursor: pointer; }
         .loader { display: inline-block; width: 24px; height: 24px; border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #000; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -17,16 +14,13 @@
 <body>
     <h1>Offline PDF Translator</h1>
     <input type="file" id="fileInput" />
-    <button class="translate-btn" onclick="translatePDF()">Translate PDF</button>
+    <button class="translate-btn" onclick="uploadFile()">Translate PDF</button>
     <div id="status" class="hidden"></div>
-    <a id="downloadLink" class="hidden" href="#" download="translated.pdf">
-        <button class="download-btn">Download Translated PDF</button>
-    </a>
+    <a id="downloadLink" class="hidden" href="#" download="translated.pdf">Download Translated PDF</a>
     <div id="loader" class="hidden loader"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script>
-        async function translatePDF() {
+        function uploadFile() {
             const fileInput = document.getElementById('fileInput');
             const statusDiv = document.getElementById('status');
             const downloadLink = document.getElementById('downloadLink');
@@ -37,40 +31,32 @@
                 return;
             }
 
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
             loader.classList.remove('hidden');
             statusDiv.textContent = 'Translating...';
             statusDiv.classList.remove('hidden');
             downloadLink.classList.add('hidden');
 
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-
-            reader.onload = async function(e) {
-                const pdfBytes = new Uint8Array(e.target.result);
-
-                // Here you should integrate the translation functionality.
-                // For demonstration, we'll simply simulate a translation.
-                await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate translation delay
-
-                // Load the PDF
-                const { PDFDocument } = PDFLib;
-                const pdfDoc = await PDFDocument.load(pdfBytes);
-                const pages = pdfDoc.getPages();
-                const firstPage = pages[0];
-                firstPage.drawText('Translated Text', { x: 50, y: 50 });
-
-                // Serialize the PDFDocument to bytes
-                const translatedPdfBytes = await pdfDoc.save();
-
-                // Create a Blob and set the download link
-                const blob = new Blob([translatedPdfBytes], { type: 'application/pdf' });
-                downloadLink.href = URL.createObjectURL(blob);
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
                 downloadLink.classList.remove('hidden');
                 statusDiv.textContent = 'Translation complete!';
                 loader.classList.add('hidden');
-            };
-
-            reader.readAsArrayBuffer(file);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.textContent = 'An error occurred.';
+                loader.classList.add('hidden');
+            });
         }
     </script>
 </body>
