@@ -30,7 +30,7 @@
 
             for (const page of pages) {
                 const { width, height } = page.getSize();
-                const textContent = await page.getTextContent();
+                const textContent = await extractTextFromPage(page);
                 const translatedText = mockTranslate(textContent);
 
                 page.drawText(translatedText, {
@@ -51,8 +51,13 @@
             downloadLink.textContent = 'Download Translated PDF';
         }
 
-        function mockTranslate(textContent) {
-            return textContent.items.map(item => item.str).join(' ').replace(/PDF/g, 'Translated PDF');
+        async function extractTextFromPage(page) {
+            const textContent = await page.getTextContent();
+            return textContent.items.map(item => item.str).join(' ');
+        }
+
+        function mockTranslate(text) {
+            return text.replace(/PDF/g, 'Translated PDF');
         }
     </script>
 </body>
