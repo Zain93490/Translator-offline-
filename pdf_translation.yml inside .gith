@@ -1,0 +1,36 @@
+name: PDF Translation Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  translate-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.8'
+
+    - name: Install dependencies
+      run: |
+        pip install fitz PyPDF2 transformers reportlab
+
+    - name: Run PDF Translation Script
+      run: |
+        python pdf_translator.py
+
+    - name: Upload Translated PDF
+      uses: actions/upload-artifact@v3
+      with:
+        name: translated-pdf
+        path: path/to/translated-pdf.pdf
